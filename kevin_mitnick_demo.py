@@ -61,7 +61,10 @@ def _cat(*tt):
 import queue as _q
 _audio_q = _q.Queue()
 
+_paplay_missing = False   # se setea una sola vez si paplay no está instalado
+
 def _audio_worker():
+    global _paplay_missing, NO_AUDIO
     _cmd = ['paplay','--raw','--format=s16le','--rate=44100','--channels=1','/dev/stdin']
     while True:
         raw, done = _audio_q.get()
@@ -69,7 +72,12 @@ def _audio_worker():
             proc = subprocess.Popen(_cmd, stdin=subprocess.PIPE,
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             proc.communicate(raw)
-        except: pass
+        except FileNotFoundError:
+            if not _paplay_missing:
+                _paplay_missing = True
+                NO_AUDIO = True   # desactivar audio para no reintentar en cada sample
+        except Exception:
+            pass
         finally:
             if done: done.set()
             _audio_q.task_done()
@@ -178,13 +186,14 @@ def play_wav_with_subs(path, subs):
     interval    = (dur * 0.78) / n   # repartir el 78% restante entre líneas
 
     _audio_q.join()
-    proc = subprocess.Popen(['paplay', path],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    fd  = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
+    proc    = None
+    old     = None
     skipped = False
     try:
+        proc = subprocess.Popen(['paplay', path],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        fd  = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
         tty.setcbreak(fd)
         print(GR + "  [ Reproduciendo... ENTER para saltar ]" + X)
         print()
@@ -219,10 +228,10 @@ def play_wav_with_subs(path, subs):
     except Exception:
         pass
     finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
-    if proc.poll() is None:
-        proc.terminate(); proc.wait()
+        if old is not None:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        if proc is not None and proc.poll() is None:
+            proc.terminate(); proc.wait()
     print()
 
 _DF={'1':(697,1209),'2':(697,1336),'3':(697,1477),'4':(770,1209),
@@ -233,6 +242,8 @@ def snd_beep(hz=880,dur=0.12,vol=0.45,bg=True):
     _play(_tone(hz,dur,vol),bg)
 def snd_speak(text, pitch=30, speed=120, voice='en', bg=False):
     """TTS via espeak-ng — pitch bajo = voz grave/amenazante."""
+    if NO_AUDIO:
+        return
     cmd = ['espeak-ng', '-v', voice, '-s', str(speed), '-p', str(pitch), text]
     def go():
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -532,7 +543,7 @@ def hexdump_scroll(label="capturando trafico", lines=16, delay=0.07):
         ascpart = "".join(chr(random.randint(0x20,0x7e)) if random.random()>0.4 else '.' for _ in range(16))
         addr = offset + i * 16
         print(GR + f"  {addr:08x}  {hexpart}  |{ascpart}|" + X)
-        p(delay * SPEED)
+        p(delay)
 
 def alert_screen(text, col=R, n=5):
     """Pantalla de alerta a pantalla completa."""
@@ -1796,7 +1807,7 @@ def cap_social():
     print()
     p(0.5)
 
-    if not ask_skip("DTMF + timbre simulado"):
+    if not NO_AUDIO and not ask_skip("DTMF + timbre simulado"):
         snd_dial("358981234567")
         p(0.4)
         print(GR+"  [Marcando: +358-9-812-34567  Nokia HQ, Helsinki, Finlandia]"+X)
