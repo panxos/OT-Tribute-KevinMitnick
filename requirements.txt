@@ -1,0 +1,20 @@
+# Python stdlib only — sin dependencias pip
+# Paquetes de sistema requeridos (instalar con tu package manager):
+#
+#   Arch Linux / Manjaro:
+#     sudo pacman -S python espeak-ng chafa libpulse
+#
+#   Ubuntu / Debian:
+#     sudo apt install python3 espeak-ng chafa pulseaudio-utils
+#
+#   Fedora / RHEL:
+#     sudo dnf install python3 espeak-ng chafa pulseaudio-utils
+#
+# Opcional (para regenerar screenshots):
+#   pip install Pillow
+
+# Sistema:
+#   python3     >= 3.8
+#   paplay      (pulseaudio-utils / pipewire-pulse)
+#   espeak-ng   (síntesis de voz TTS)
+#   chafa       (renderizado de imágenes en terminal ANSI)

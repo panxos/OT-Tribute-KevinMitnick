@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Audio original (archivos pesados — descargar desde takedown.com)
+audio/voicemail/*.wav
+audio/voicemail/*.au
+audio/lottor/*.wav
+audio/lottor/*.au
+
+# Imágenes grandes
+late.jpg
+
+# Transcripts HTML crudos (opcionales)
+# transcripts/
+
+# Archivos de sesión y temporales
+*.swp
+*.swo
+.DS_Store
