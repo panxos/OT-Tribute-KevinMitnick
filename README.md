@@ -297,7 +297,7 @@ OT-Tribute-KevinMitnick/
 **Creado por [faravena](https://github.com/panxos) (P4nx0z)**
 
 [![GitHub](https://img.shields.io/badge/GitHub-panxos-181717?style=flat-square&logo=github)](https://github.com/panxos)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-faravena-0A66C2?style=flat-square&logo=linkedin)](https://linkedin.com/in/faravena)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-faravena-0A66C2?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/faravena/)
 [![Web](https://img.shields.io/badge/Web-soporteinfo.net-00AA44?style=flat-square)](https://soporteinfo.net)
 
 **En memoria de Kevin David Mitnick**  
