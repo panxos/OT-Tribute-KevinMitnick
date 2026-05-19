@@ -85,17 +85,16 @@ def _play(samps, bg=True):
     if not bg:
         done.wait()
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Si corremos desde ~/kevin_mitnick_demo.py, buscar assets en rutas conocidas
-_MEGA_CANDIDATES = [
-    os.path.expanduser("~/MEGA/Proyectos/GitHUB/OT-Tribute-KevinMitnick"),
-    os.path.expanduser("~/MEGA/Proyectos/OT-Tribute-KevinMitnick"),
-]
+# Resolución portable de rutas:
+# 1. realpath resuelve symlinks → si ~/kevin_mitnick_demo.py es symlink al repo, funciona
+# 2. Fallback al directorio de trabajo actual (útil si se ejecuta con python3 ./kevin...)
+# 3. Nunca hardcodeamos rutas de usuario
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if not os.path.isdir(os.path.join(SCRIPT_DIR, "audio")):
-    for _cand in _MEGA_CANDIDATES:
-        if os.path.isdir(os.path.join(_cand, "audio")):
-            SCRIPT_DIR = _cand
-            break
+    _cwd = os.getcwd()
+    if os.path.isdir(os.path.join(_cwd, "audio")):
+        SCRIPT_DIR = _cwd
+
 AUDIO_VM  = os.path.join(SCRIPT_DIR, "audio", "voicemail")
 AUDIO_LOT = os.path.join(SCRIPT_DIR, "audio", "lottor")
 
