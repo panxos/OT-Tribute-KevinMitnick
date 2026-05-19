@@ -86,10 +86,16 @@ def _play(samps, bg=True):
         done.wait()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Si corremos desde ~/kevin_mitnick_demo.py, los assets están en MEGA
-_MEGA = os.path.expanduser("~/MEGA/Proyectos/OT-Tribute-KevinMitnick")
-if not os.path.isdir(os.path.join(SCRIPT_DIR, "audio")) and os.path.isdir(_MEGA):
-    SCRIPT_DIR = _MEGA
+# Si corremos desde ~/kevin_mitnick_demo.py, buscar assets en rutas conocidas
+_MEGA_CANDIDATES = [
+    os.path.expanduser("~/MEGA/Proyectos/GitHUB/OT-Tribute-KevinMitnick"),
+    os.path.expanduser("~/MEGA/Proyectos/OT-Tribute-KevinMitnick"),
+]
+if not os.path.isdir(os.path.join(SCRIPT_DIR, "audio")):
+    for _cand in _MEGA_CANDIDATES:
+        if os.path.isdir(os.path.join(_cand, "audio")):
+            SCRIPT_DIR = _cand
+            break
 AUDIO_VM  = os.path.join(SCRIPT_DIR, "audio", "voicemail")
 AUDIO_LOT = os.path.join(SCRIPT_DIR, "audio", "lottor")
 
@@ -124,6 +130,98 @@ def play_wav_skippable(path):
         pass
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    if proc.poll() is None:
+        proc.terminate(); proc.wait()
+    print()
+
+import wave as _wave
+
+def _wav_duration(path):
+    """Duración en segundos de un archivo WAV."""
+    try:
+        with _wave.open(path) as w:
+            return w.getnframes() / w.getframerate()
+    except Exception:
+        return 0.0
+
+def play_wav_with_subs(path, subs):
+    """Reproduce WAV y muestra subtítulos sincronizados mientras suena.
+
+    subs: lista de (col_key, texto_eng, texto_esp)
+    La transcripción se distribuye uniformemente a lo largo de la duración real.
+    ENTER salta el audio + subtítulos restantes.
+    """
+    if NO_AUDIO:
+        print(GR + "  [ ♪ AUDIO — modo sin sonido activo ]" + X)
+        for col_key, eng, esp in subs:
+            col = (R+BD if col_key=='R' else M+BD if col_key=='M' else
+                   GR+DM if col_key=='GR' else WC+BD)
+            print(f"  {col}{eng}{X}")
+            print(f"  {GR}  → {esp}{X}")
+            print()
+        return
+
+    if not os.path.exists(path):
+        # Sin WAV — mostrar transcripción sola con delay
+        for col_key, eng, esp in subs:
+            col = (R+BD if col_key=='R' else M+BD if col_key=='M' else
+                   GR+DM if col_key=='GR' else WC+BD)
+            print(f"  {col}{eng}{X}")
+            print(f"  {GR}  → {esp}{X}")
+            print()
+            p(1.2)
+        return
+
+    dur = _wav_duration(path)
+    n   = max(len(subs), 1)
+    # Reservar 15% inicial (intro del mensaje) antes del primer subtítulo
+    start_delay = dur * 0.12
+    interval    = (dur * 0.78) / n   # repartir el 78% restante entre líneas
+
+    _audio_q.join()
+    proc = subprocess.Popen(['paplay', path],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    fd  = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    skipped = False
+    try:
+        tty.setcbreak(fd)
+        print(GR + "  [ Reproduciendo... ENTER para saltar ]" + X)
+        print()
+
+        # Pausa inicial (intro del mensaje)
+        t0 = time.time()
+        while time.time() - t0 < start_delay and proc.poll() is None:
+            if select.select([sys.stdin], [], [], 0.05)[0]:
+                sys.stdin.read(1); skipped = True; break
+
+        # Mostrar cada línea sincronizada
+        for col_key, eng, esp in subs:
+            if skipped or proc.poll() is not None:
+                break
+            col = (R+BD if col_key=='R' else M+BD if col_key=='M' else
+                   GR+DM if col_key=='GR' else WC+BD)
+            sys.stdout.write(f"  {col}{eng}{X}\n")
+            sys.stdout.write(f"  {GR}  → {esp}{X}\n\n")
+            sys.stdout.flush()
+
+            t0 = time.time()
+            while time.time() - t0 < interval and proc.poll() is None:
+                if select.select([sys.stdin], [], [], 0.05)[0]:
+                    sys.stdin.read(1); skipped = True; break
+
+        # Esperar fin del audio si no fue saltado
+        if not skipped:
+            while proc.poll() is None:
+                if select.select([sys.stdin], [], [], 0.1)[0]:
+                    sys.stdin.read(1); break
+
+    except Exception:
+        pass
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
     if proc.poll() is None:
         proc.terminate(); proc.wait()
     print()
@@ -1536,23 +1634,22 @@ def cap_voicemail():
         hr("─", Y)
         print()
 
-        # Mostrar transcripción primero
-        for col_key, eng, esp in lineas:
-            col = (R+BD if col_key=='R' else M+BD if col_key=='M' else
-                   GR+DM if col_key=='GR' else WC+BD)
-            print(f"  {col}{eng}{X}")
-            print(f"  {GR}  → {esp}{X}")
-            print()
-            p(0.25)
-
-        print()
         wav_path = os.path.join(AUDIO_VM, wavfile)
         if os.path.exists(wav_path):
-            print(G+BD+"  🔊 AUDIO REAL — takedown.com" + X)
-            p(0.3)
-            play_wav_skippable(wav_path)
+            print(G+BD+"  🔊 AUDIO REAL — takedown.com  [ ENTER para saltar ]" + X)
+            p(0.4)
+            play_wav_with_subs(wav_path, lineas)
         else:
+            # Sin WAV — mostrar transcripción con delay y bip de contestador
             snd_am(bg=False)
+            p(0.3)
+            for col_key, eng, esp in lineas:
+                col = (R+BD if col_key=='R' else M+BD if col_key=='M' else
+                       GR+DM if col_key=='GR' else WC+BD)
+                print(f"  {col}{eng}{X}")
+                print(f"  {GR}  → {esp}{X}")
+                print()
+                p(0.8)
         p(0.3)
 
         if num in ("5","6"):
